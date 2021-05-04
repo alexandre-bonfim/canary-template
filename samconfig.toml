@@ -1,0 +1,11 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "canary-template"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-1h2q3ea3qol6l"
+s3_prefix = "canary-template"
+region = "eu-west-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "EnvType=\"stage\""

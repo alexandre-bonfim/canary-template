@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'canary-template: - Sample SAM Template for version, alias, canary deploy
+  and API/Lambda alarms - Inform Slack the channel
+
+  '
+Parameters:
+  EnvType:
+    Description: Set environment types
+    Type: String
+    Default: stage
+    AllowedValues:
+    - stage
+    - prod
+    - dev
+Globals:
+  Function:
+    Timeout: 3
+  Api:
+    Cors:
+      AllowMethods: '''GET,POST,OPTIONS'''
+      AllowHeaders: '''*'''
+      AllowOrigin: '''*'''
+      AllowCredentials: '''*'''
+Resources:
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+  HelloWorldAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName:
+        Ref: EnvType
+  LamdbaToSlackFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LamdbaToSlackFunction
+      Handler: app.lambdaToSlackHandler
+      Runtime: nodejs14.x
+      Events:
+        SNS:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: AlarmTopic
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: HelloWorldFunction
+      Handler: app.helloHandler
+      Runtime: nodejs14.x
+      AutoPublishAlias: live
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            RestApiId:
+              Ref: HelloWorldAPI
+            Path: /hello
+            Method: get
+      DeploymentPreference:
+        Type: Canary10Percent5Minutes
+        Alarms:
+        - Ref: HelloWorldFunctionAliasErrorAlarm
+  HelloWorldFunctionAliasErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      ComparisonOperator: GreaterThanThreshold
+      EvaluationPeriods: 1
+      Period: 60
+      Statistic: Sum
+      Threshold: 2
+      AlarmDescription: Fire alarm if more than 3 errors occur in any 60 second period
+      Dimensions:
+      - Name: Resource
+        Value:
+          Fn::Sub: ${HelloWorldFunction}:live
+      - Name: FunctionName
+        Value:
+          Ref: HelloWorldFunction
+      AlarmActions:
+      - Ref: AlarmTopic
